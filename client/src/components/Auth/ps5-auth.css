@@ -1,0 +1,19 @@
+/* PS5 PRO CHAT auth theme. Scoped to auth layout only. */
+.ps5-auth-shell{--ps5-gold:#ffbf12;--ps5-ink:#080a0d;background:#080a0d!important;color:#f5f5f5;isolation:isolate}
+.ps5-auth-shell::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 38%,#5136002b,transparent 50%),repeating-linear-gradient(125deg,transparent 0 74px,#f9ba0810 75px 76px,transparent 77px 140px);z-index:-1}
+.ps5-auth-skyline{height:clamp(120px,19vh,210px);flex-shrink:0;background:#090909 url('/assets/ps5-pro-chat-banner.svg') center 48%/cover no-repeat;border-bottom:2px solid #e9a500;box-shadow:0 12px 36px #000}
+.ps5-auth-brand{display:flex;flex-direction:column;align-items:center;gap:7px;margin:20px auto 0;text-align:center}
+.ps5-auth-brand strong{font-size:clamp(1.8rem,4vw,3.6rem);font-weight:900;letter-spacing:.09em;font-style:italic;line-height:1.1;color:#f7f7f7;text-shadow:0 2px 20px #000}
+.ps5-auth-brand small{font-size:clamp(.7rem,1.5vw,1rem);letter-spacing:.27em;color:#f9c537}
+.ps5-auth-mark{color:#ffbf12;font-size:1.4rem}
+.ps5-auth-original-logo{display:none}
+.ps5-auth-shell main{padding:24px 16px 48px;align-items:flex-start}
+.ps5-auth-card{background:#0d0f12!important;border:1px solid #e7a900;border-radius:20px!important;box-shadow:0 0 0 1px #ffbf1230,0 20px 60px #000a,0 0 32px #b87a001c;padding:28px!important;width:min(100%,520px)!important;max-width:520px!important}
+.ps5-auth-card h1{color:#fff!important;font-weight:700!important;font-size:clamp(1.35rem,2.6vw,1.8rem)!important}
+.ps5-auth-card input{background:#171a1e!important;color:#fff!important;border-color:#555!important}
+.ps5-auth-card input:focus{border-color:#ffc21a!important;outline-color:#ffc21a!important}
+.ps5-auth-card button[type="submit"]{background:#ffbf12!important;color:#080a0d!important;border-color:#ffbf12!important;font-weight:800!important}
+.ps5-auth-card button[type="submit"]:hover{background:#ffd45b!important}
+.ps5-auth-card a{color:#ffc522!important}
+.ps5-auth-shell footer{color:#b9b9b9}
+@media(max-width:640px){.ps5-auth-skyline{height:115px}.ps5-auth-brand{margin-top:15px}.ps5-auth-brand small{letter-spacing:.1em}.ps5-auth-card{padding:20px!important}.ps5-auth-shell main{padding-top:22px}}
