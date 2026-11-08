@@ -1,3 +1,4 @@
+import './ps5-auth.css';
 import { ThemeSelector } from '@librechat/client';
 import { TStartupConfig } from 'librechat-data-provider';
 import { ErrorMessage } from '~/components/Auth/ErrorMessage';
@@ -88,14 +89,16 @@ function AuthLayout({
   };
 
   return (
-    <div className="bg-surface-primary relative flex min-h-screen flex-col">
+    <div className="ps5-auth-shell bg-surface-primary relative flex min-h-screen flex-col">
       <Banner />
+      <div className="ps5-auth-skyline" role="img" aria-label="Toronto skyline at sunset, PS5 PRO CHAT" />
+      <div className="ps5-auth-brand"><span className="ps5-auth-mark" aria-hidden="true">✦</span><strong>PS5 PRO CHAT</strong><small>AI · PS5 PRO · TOOLS · AUTOMATION</small></div>
       <BlinkAnimation active={isFetching}>
-        <div className="mt-6 h-10 w-full bg-cover">
+        <div className="ps5-auth-original-logo mt-6 h-10 w-full bg-cover">
           <img
             src="assets/logo.svg"
             className="h-full w-full object-contain"
-            alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'LibreChat' })}
+            alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'PS5 PRO CHAT' })}
           />
         </div>
       </BlinkAnimation>
@@ -107,7 +110,7 @@ function AuthLayout({
       <main className="flex grow items-center justify-center">
         <div
           className={cn(
-            'bg-surface-primary overflow-hidden px-6 py-4 sm:rounded-lg',
+            'ps5-auth-card bg-surface-primary overflow-hidden px-6 py-4 sm:rounded-lg',
             isTwoFactorSetup ? 'w-11/12 max-w-lg' : 'w-authPageWidth sm:max-w-md',
           )}
         >
