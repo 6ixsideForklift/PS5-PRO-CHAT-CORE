@@ -22,6 +22,9 @@ services:
       - "127.0.0.1:3001:3000"
   mongodb:
     container_name: !reset null
+    user: !reset null
+    volumes: !override
+      - ps5-mongo-data:/data/db
   meilisearch:
     container_name: !reset null
   vectordb:
@@ -30,3 +33,6 @@ services:
     container_name: !reset null
     env_file:
       - .env.ps5-dev
+
+volumes:
+  ps5-mongo-data:
