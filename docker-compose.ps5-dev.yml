@@ -1,0 +1,32 @@
+name: ps5-pro-chat-dev
+
+services:
+  api:
+    container_name: !reset null
+    image: ps5-pro-chat:dev
+    build:
+      context: .
+      target: node
+    ports: !override
+      - "127.0.0.1:3081:3080"
+    volumes:
+      - type: bind
+        source: ./.env.ps5-dev
+        target: /app/.env
+      - type: bind
+        source: ./librechat.yaml
+        target: /app/librechat.yaml
+  admin-panel:
+    container_name: !reset null
+    ports: !override
+      - "127.0.0.1:3001:3000"
+  mongodb:
+    container_name: !reset null
+  meilisearch:
+    container_name: !reset null
+  vectordb:
+    container_name: !reset null
+  rag_api:
+    container_name: !reset null
+    env_file:
+      - .env.ps5-dev
