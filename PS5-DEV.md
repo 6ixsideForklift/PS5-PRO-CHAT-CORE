@@ -37,6 +37,23 @@ separate MongoDB volume. The first confirmed account in an empty LibreChat
 database becomes the administrator. Do not mix this volume with the existing LibreChat
 deployment on port 3080.
 
+## Web search for agents
+
+In the ignored local `librechat.yaml`, add this top-level block to enable keyless
+web search for the development app:
+
+```yaml
+webSearch:
+  searchProvider: keenable
+  scraperProvider: keenable
+  rerankerType: none
+```
+
+Restart only the development API container, refresh the Agent Builder, and add
+**Web Search** from the Tool Library. The PS5 model must support tool calls for
+an agent to invoke it. The local endpoint returned a function call in the
+development tool-call check.
+
 To stop this development stack without deleting its data:
 
 ```powershell
