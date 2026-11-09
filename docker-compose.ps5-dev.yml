@@ -4,6 +4,8 @@ services:
   api:
     container_name: !reset null
     image: ps5-pro-chat:dev
+    environment:
+      - ADMIN_PANEL_URL=http://localhost:3001
     build:
       context: .
       target: node

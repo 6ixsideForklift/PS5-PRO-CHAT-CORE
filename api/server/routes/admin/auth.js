@@ -38,6 +38,7 @@ const {
   upsertBalanceFields,
 } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
+const supabaseAuth = require('~/server/services/supabaseAuth');
 const getLogStores = require('~/cache/getLogStores');
 const { getOpenIdConfig } = require('~/strategies');
 const middleware = require('~/server/middleware');
@@ -165,7 +166,7 @@ router.post(
   middleware.loginLimiter,
   middleware.checkBan,
   middleware.validateEmailLogin,
-  middleware.requireLocalAuth,
+  supabaseAuth?.login ?? middleware.requireLocalAuth,
   tenantContextMiddleware,
   requireAdminAccess,
   setBalanceConfig,

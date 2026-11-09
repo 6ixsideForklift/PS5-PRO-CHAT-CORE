@@ -7,8 +7,6 @@ const {
   createTwoFactorManagementLimiter,
   forceRefreshCloudFrontAuthCookies,
   blockTwoFactorDisableWhenRequired,
-  createSupabaseAuthHandlers,
-  getBalanceConfig,
   requireTwoFactorSetupAcknowledgementToken,
   requireTwoFactorSetupFinalizationToken,
 } = require('@librechat/api');
@@ -43,16 +41,12 @@ const {
 } = require('~/server/controllers/auth/TwoFactorAuthController');
 const { logoutController } = require('~/server/controllers/auth/LogoutController');
 const { loginController } = require('~/server/controllers/auth/LoginController');
-const { registerSchema } = require('~/strategies/validators');
 const {
   findBalanceByUser,
   upsertBalanceFields,
-  findUser,
-  createUserIfAbsent,
-  countUsers,
-  deleteAllUserSessions,
 } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
+const supabaseAuth = require('~/server/services/supabaseAuth');
 const middleware = require('~/server/middleware');
 
 const setBalanceConfig = createSetBalanceConfig({
@@ -76,21 +70,6 @@ const getCloudFrontAuthCookieRefreshResult = (req, res) => {
 };
 
 const ldapAuth = !!process.env.LDAP_URL && !!process.env.LDAP_USER_SEARCH_BASE;
-const supabaseAuth =
-  process.env.SUPABASE_AUTH_URL && process.env.SUPABASE_AUTH_PUBLISHABLE_KEY
-    ? createSupabaseAuthHandlers({
-        url: process.env.SUPABASE_AUTH_URL,
-        publishableKey: process.env.SUPABASE_AUTH_PUBLISHABLE_KEY,
-        getAppConfig,
-        getBalanceConfig,
-        findUser,
-        createUserIfAbsent,
-        findBalanceByUser,
-        countUsers,
-        deleteAllUserSessions,
-        registrationSchema: registerSchema,
-      })
-    : null;
 //Local
 router.post('/logout', middleware.requireJwtAuth, logoutController);
 router.post(
