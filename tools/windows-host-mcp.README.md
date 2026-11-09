@@ -50,3 +50,29 @@ Restart the LibreChat API container after changing `librechat.yaml` or its env
 file. Attach `windows-host` only to the private admin agent. The helper offers
 directory listing, UTF-8 file reads and writes, and PowerShell commands. There
 are no path restrictions; commands execute without an approval prompt.
+
+## Screen control
+
+The helper also offers `screen_monitors`, `screen_capture`, `screen_click`,
+`screen_type`, `screen_key`, `screen_scroll`, and `screen_control_end`. These
+require Python 3, Pillow, pytesseract, pywin32, Tesseract OCR, and Windows
+Tkinter on the host. `screen_capture` returns compact OCR text and coordinates
+for visible windows and controls. The local text model cannot accept a full
+MCP screenshot without exceeding its context window. A yellow **PS5 PRO
+OPERATOR · SCREEN CONTROL ACTIVE** banner appears on every monitor while the
+agent uses these tools. It scales with each monitor's resolution and is
+translucent so the desktop remains visible behind it. Click its **STOP** button
+or press **Ctrl+Alt+Esc** from any monitor to stop screen control. Further
+screen actions are refused until you click the **Resume PS5 Screen Control**
+desktop shortcut. The indicator also disappears 150 seconds after the last
+screen action or when `screen_control_end` runs. Windows excludes the banners from screen captures
+where display affinity is supported.
+
+`screen_monitors` lists monitor indexes and screen coordinates. The default
+capture reads the primary monitor; `monitor` selects another, `scope: all`
+covers all monitors, and `region` reads a smaller rectangle with absolute
+coordinates. Screen clicks and keys require a capture from the last 120 seconds.
+
+Screen actions run as the signed-in Windows user and cannot control elevated
+windows or the Windows secure desktop. Only the private admin agent should use
+this server; the standard USER role must retain MCP Use disabled.

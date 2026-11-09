@@ -197,6 +197,8 @@ scripts/activity-labels/results/
 /.ps5-windows-mcp.log
 /.ps5-windows-mcp.err
 /.ps5-startup.log
+/tools/__pycache__/
+/.ps5-screen-paused
 # Chrome user-data directories a Lighthouse run leaves in the repository root when the browser
 # is handed a Windows profile path from WSL: the whole path arrives as one directory name.
 /*lighthouse.[0-9]*/

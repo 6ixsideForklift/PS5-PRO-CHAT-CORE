@@ -1,6 +1,8 @@
 import { readFile, writeFile, readdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { timingSafeEqual } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
@@ -10,6 +12,97 @@ const config = JSON.parse(await readFile(new URL('../.ps5-windows-mcp.json', imp
 if (!config.token || !config.adminUserId) throw new Error('Missing private MCP configuration');
 const port = 8766;
 const app = createMcpExpressApp({ allowedHosts: ['127.0.0.1', 'localhost', 'host.docker.internal'] });
+const screenScript = fileURLToPath(new URL('./windows-screen.py', import.meta.url));
+const screenPausedFile = fileURLToPath(new URL('../.ps5-screen-paused', import.meta.url));
+let overlayProcess;
+let overlayTimer;
+let lastScreen;
+let screenQueue = Promise.resolve();
+
+function withScreenLock(operation) {
+  const run = screenQueue.then(operation);
+  screenQueue = run.catch(() => {});
+  return run;
+}
+
+function endScreenControl() {
+  clearTimeout(overlayTimer);
+  if (overlayProcess && overlayProcess.exitCode === null) overlayProcess.kill();
+  overlayProcess = undefined;
+  lastScreen = undefined;
+}
+
+function requireScreenEnabled() {
+  if (existsSync(screenPausedFile)) {
+    lastScreen = undefined;
+    throw new Error('Screen control was stopped on the laptop. Use the Resume PS5 Screen Control desktop shortcut before trying again.');
+  }
+}
+
+function keepScreenIndicatorVisible() {
+  if (!overlayProcess || overlayProcess.exitCode !== null) {
+    overlayProcess = spawn('python', [screenScript, 'overlay'], {
+      windowsHide: true, stdio: 'ignore',
+    });
+    const currentOverlay = overlayProcess;
+    overlayProcess.on('error', (error) => console.error('Screen indicator failed:', error.message));
+    overlayProcess.on('exit', () => {
+      if (overlayProcess === currentOverlay) {
+        overlayProcess = undefined;
+        lastScreen = undefined;
+      }
+    });
+  }
+  clearTimeout(overlayTimer);
+  overlayTimer = setTimeout(endScreenControl, 150_000);
+}
+
+function screenIsFresh() {
+  requireScreenEnabled();
+  if (!lastScreen || Date.now() - lastScreen.when > 120_000) {
+    throw new Error('Take a fresh screen capture before clicking or typing');
+  }
+}
+
+function screenPointIsVisible(x, y) {
+  screenIsFresh();
+  const { originX, originY, width, height } = lastScreen;
+  if (x < originX || y < originY || x >= originX + width || y >= originY + height) {
+    throw new Error('Screen coordinates are outside the most recent capture');
+  }
+}
+
+async function runScreenProcess(request) {
+  const result = await new Promise((resolve, reject) => {
+    const child = spawn('python', [screenScript], { windowsHide: true, timeout: 30_000 });
+    let output = '';
+    let errors = '';
+    child.stdout.on('data', (data) => {
+      output += data.toString();
+      if (output.length > 25_000_000) child.kill();
+    });
+    child.stderr.on('data', (data) => { errors = (errors + data.toString()).slice(0, 2000); });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) return reject(new Error(errors || output.slice(0, 500) || 'Screen action failed'));
+      try { resolve(JSON.parse(output)); } catch { reject(new Error('Invalid screen response')); }
+    });
+    child.stdin.end(JSON.stringify(request));
+  });
+  if (result.error) throw new Error(result.error);
+  return result;
+}
+
+async function runScreenAction(request) {
+  requireScreenEnabled();
+  const result = await runScreenProcess(request);
+  lastScreen = { originX: result.originX, originY: result.originY,
+    width: result.width, height: result.height, when: Date.now() };
+  keepScreenIndicatorVisible();
+  return { content: [
+    { type: 'text', text: `Screen origin (${result.originX}, ${result.originY}); size ${result.width} × ${result.height}. Coordinates are absolute Windows desktop pixels. OCR text and window/control rectangles: ${JSON.stringify({ text: result.text, windows: result.windows })}` },
+  ] };
+}
 
 function sameSecret(candidate, expected) {
   if (typeof candidate !== 'string') return false;
@@ -63,6 +156,87 @@ function createServer(adminRequest) {
       child.on('close', (code, signal) => resolve(`Exit code: ${code ?? signal}\n${output}`));
     });
     return { content: [{ type: 'text', text: result }] };
+  });
+  server.registerTool('screen_capture', {
+    description: 'Read the Windows desktop as OCR text and window/control rectangles with absolute coordinates. Default is the primary monitor. Call screen_monitors to get monitor indexes, or use scope=all or a region. Starts visible control banners on every monitor. Use before any screen action.',
+    inputSchema: { scope: z.enum(['primary', 'all']).default('primary'),
+      monitor: z.number().int().min(0).optional(),
+      region: z.object({ x: z.number().int(), y: z.number().int(),
+        width: z.number().int().min(1), height: z.number().int().min(1) }).optional() },
+  }, async ({ scope, monitor, region }) => {
+    authorize();
+    return withScreenLock(() => runScreenAction({ action: 'capture', scope, monitor, region }));
+  });
+  server.registerTool('screen_monitors', {
+    description: 'List connected monitors with their index and absolute Windows desktop coordinates. Does not take a screenshot.',
+    inputSchema: {},
+  }, async () => {
+    authorize();
+    const result = await runScreenProcess({ action: 'monitors' });
+    return { content: [{ type: 'text', text: JSON.stringify(result.monitors) }] };
+  });
+  server.registerTool('screen_click', {
+    description: 'Click at absolute desktop coordinates from a recent screen_capture. Returns a new screenshot. The on-screen indicator remains visible.',
+    inputSchema: { x: z.number().int(), y: z.number().int(),
+      button: z.enum(['left', 'right']).default('left'), count: z.number().int().min(1).max(2).default(1) },
+  }, async ({ x, y, button, count }) => {
+    authorize();
+    return withScreenLock(() => {
+      screenPointIsVisible(x, y);
+      keepScreenIndicatorVisible();
+      return runScreenAction({ action: 'click', x, y, button, count,
+        region: { x: lastScreen.originX, y: lastScreen.originY,
+          width: lastScreen.width, height: lastScreen.height } });
+    });
+  });
+  server.registerTool('screen_type', {
+    description: 'Type text into the currently focused Windows control. Requires a recent screen capture; returns refreshed OCR and window positions.',
+    inputSchema: { text: z.string().min(1).max(2000) },
+  }, async ({ text }) => {
+    authorize();
+    return withScreenLock(() => {
+      screenIsFresh();
+      keepScreenIndicatorVisible();
+      return runScreenAction({ action: 'type', text,
+        region: { x: lastScreen.originX, y: lastScreen.originY,
+          width: lastScreen.width, height: lastScreen.height } });
+    });
+  });
+  server.registerTool('screen_key', {
+    description: 'Press a key or shortcut such as Enter, Escape, Ctrl+A, or Alt+Tab. Requires a recent screenshot; returns a new screenshot.',
+    inputSchema: { keys: z.string().min(1).max(40) },
+  }, async ({ keys }) => {
+    authorize();
+    return withScreenLock(() => {
+      screenIsFresh();
+      keepScreenIndicatorVisible();
+      return runScreenAction({ action: 'key', keys,
+        region: { x: lastScreen.originX, y: lastScreen.originY,
+          width: lastScreen.width, height: lastScreen.height } });
+    });
+  });
+  server.registerTool('screen_scroll', {
+    description: 'Scroll at absolute desktop coordinates; positive steps scroll up, negative steps scroll down. Returns a new screenshot.',
+    inputSchema: { x: z.number().int(), y: z.number().int(), steps: z.number().int().min(-10).max(10) },
+  }, async ({ x, y, steps }) => {
+    authorize();
+    return withScreenLock(() => {
+      screenPointIsVisible(x, y);
+      keepScreenIndicatorVisible();
+      return runScreenAction({ action: 'scroll', x, y, steps,
+        region: { x: lastScreen.originX, y: lastScreen.originY,
+          width: lastScreen.width, height: lastScreen.height } });
+    });
+  });
+  server.registerTool('screen_control_end', {
+    description: 'End the screen-control session and remove the visible indicator.',
+    inputSchema: {},
+  }, async () => {
+    authorize();
+    return withScreenLock(() => {
+      endScreenControl();
+      return { content: [{ type: 'text', text: 'Screen control ended' }] };
+    });
   });
   return server;
 }

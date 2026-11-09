@@ -22,5 +22,15 @@ $desktop.IconLocation = "$icon,0"
 $desktop.Description = 'Open PS5 PRO CHAT on this laptop'
 $desktop.Save()
 
+$resumeLink = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Resume PS5 Screen Control.lnk'
+$resume = $shell.CreateShortcut($resumeLink)
+$resume.TargetPath = Join-Path $PSHOME 'powershell.exe'
+$resume.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $PSScriptRoot 'resume-screen-control.ps1')`""
+$resume.WorkingDirectory = $project
+$resume.IconLocation = "$icon,0"
+$resume.Description = 'Allow PS5 Pro Operator to control the screen again after STOP'
+$resume.Save()
+
 Write-Output "Installed startup shortcut: $startupLink"
 Write-Output "Installed desktop shortcut: $desktopLink"
+Write-Output "Installed screen resume shortcut: $resumeLink"
