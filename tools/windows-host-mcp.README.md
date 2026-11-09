@@ -72,6 +72,14 @@ where display affinity is supported.
 capture reads the primary monitor; `monitor` selects another, `scope: all`
 covers all monitors, and `region` reads a smaller rectangle with absolute
 coordinates. Screen clicks and keys require a capture from the last 120 seconds.
+Pass a window's exact title as `activate_window_title` to `screen_capture` when
+it is behind another app or only appears on the taskbar. `screen_click` requires
+the exact `window_title`; it restores and foregrounds that window and refuses
+to click if another window covers the target point. Typing, keys, and scrolling
+are refused if the target loses focus. `screen_type` pastes the requested text
+and restores supported clipboard formats; it refuses to paste when the current
+clipboard cannot be safely preserved. Verify saved files separately before
+reporting success.
 
 Screen actions run as the signed-in Windows user and cannot control elevated
 windows or the Windows secure desktop. Only the private admin agent should use

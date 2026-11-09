@@ -17,6 +17,7 @@ const screenPausedFile = fileURLToPath(new URL('../.ps5-screen-paused', import.m
 let overlayProcess;
 let overlayTimer;
 let lastScreen;
+let lastTargetHandle;
 let screenQueue = Promise.resolve();
 
 function withScreenLock(operation) {
@@ -30,11 +31,13 @@ function endScreenControl() {
   if (overlayProcess && overlayProcess.exitCode === null) overlayProcess.kill();
   overlayProcess = undefined;
   lastScreen = undefined;
+  lastTargetHandle = undefined;
 }
 
 function requireScreenEnabled() {
   if (existsSync(screenPausedFile)) {
     lastScreen = undefined;
+    lastTargetHandle = undefined;
     throw new Error('Screen control was stopped on the laptop. Use the Resume PS5 Screen Control desktop shortcut before trying again.');
   }
 }
@@ -50,6 +53,7 @@ function keepScreenIndicatorVisible() {
       if (overlayProcess === currentOverlay) {
         overlayProcess = undefined;
         lastScreen = undefined;
+        lastTargetHandle = undefined;
       }
     });
   }
@@ -97,10 +101,11 @@ async function runScreenAction(request) {
   requireScreenEnabled();
   const result = await runScreenProcess(request);
   lastScreen = { originX: result.originX, originY: result.originY,
-    width: result.width, height: result.height, when: Date.now() };
+    width: result.width, height: result.height, windows: result.windows, when: Date.now() };
+  if (request.action === 'click') lastTargetHandle = result.activeHandle;
   keepScreenIndicatorVisible();
   return { content: [
-    { type: 'text', text: `Screen origin (${result.originX}, ${result.originY}); size ${result.width} × ${result.height}. Coordinates are absolute Windows desktop pixels. OCR text and window/control rectangles: ${JSON.stringify({ text: result.text, windows: result.windows })}` },
+    { type: 'text', text: `Screen origin (${result.originX}, ${result.originY}); size ${result.width} × ${result.height}. Foreground window: ${result.foregroundWindow}. Coordinates are absolute Windows desktop pixels. OCR text and window/control rectangles: ${JSON.stringify({ text: result.text, windows: result.windows })}` },
   ] };
 }
 
@@ -158,14 +163,21 @@ function createServer(adminRequest) {
     return { content: [{ type: 'text', text: result }] };
   });
   server.registerTool('screen_capture', {
-    description: 'Read the Windows desktop as OCR text and window/control rectangles with absolute coordinates. Default is the primary monitor. Call screen_monitors to get monitor indexes, or use scope=all or a region. Starts visible control banners on every monitor. Use before any screen action.',
+    description: 'Read the Windows desktop as OCR text and window/control rectangles. Windows marked foreground/frontmostAtCenter are visibly in front. To bring a taskbar-only or covered window onto the screen first, pass its exact title as activate_window_title. Default is primary monitor. Starts visible control banners. Use before screen actions.',
     inputSchema: { scope: z.enum(['primary', 'all']).default('primary'),
       monitor: z.number().int().min(0).optional(),
+      activate_window_title: z.string().min(1).optional(),
       region: z.object({ x: z.number().int(), y: z.number().int(),
         width: z.number().int().min(1), height: z.number().int().min(1) }).optional() },
-  }, async ({ scope, monitor, region }) => {
+  }, async ({ scope, monitor, region, activate_window_title }) => {
     authorize();
-    return withScreenLock(() => runScreenAction({ action: 'capture', scope, monitor, region }));
+    return withScreenLock(() => {
+      if (activate_window_title) {
+        requireScreenEnabled();
+        keepScreenIndicatorVisible();
+      }
+      return runScreenAction({ action: 'capture', scope, monitor, region, activate_window_title });
+    });
   });
   server.registerTool('screen_monitors', {
     description: 'List connected monitors with their index and absolute Windows desktop coordinates. Does not take a screenshot.',
@@ -176,41 +188,43 @@ function createServer(adminRequest) {
     return { content: [{ type: 'text', text: JSON.stringify(result.monitors) }] };
   });
   server.registerTool('screen_click', {
-    description: 'Click at absolute desktop coordinates from a recent screen_capture. Returns a new screenshot. The on-screen indicator remains visible.',
-    inputSchema: { x: z.number().int(), y: z.number().int(),
+    description: 'Click within a named window at absolute desktop coordinates from a recent capture. Give the exact window_title shown by capture. Restores and foregrounds that window, verifies it is visibly at the click point, then clicks. Refuses if another window covers it.',
+    inputSchema: { window_title: z.string().min(1), x: z.number().int(), y: z.number().int(),
       button: z.enum(['left', 'right']).default('left'), count: z.number().int().min(1).max(2).default(1) },
-  }, async ({ x, y, button, count }) => {
+  }, async ({ window_title, x, y, button, count }) => {
     authorize();
     return withScreenLock(() => {
       screenPointIsVisible(x, y);
       keepScreenIndicatorVisible();
-      return runScreenAction({ action: 'click', x, y, button, count,
+      return runScreenAction({ action: 'click', window_title, x, y, button, count,
         region: { x: lastScreen.originX, y: lastScreen.originY,
           width: lastScreen.width, height: lastScreen.height } });
     });
   });
   server.registerTool('screen_type', {
-    description: 'Type text into the currently focused Windows control. Requires a recent screen capture; returns refreshed OCR and window positions.',
-    inputSchema: { text: z.string().min(1).max(2000) },
+    description: 'Type text after screen_click has focused the intended window. Refuses if another window has taken focus. Returns refreshed OCR and window positions.',
+    inputSchema: { text: z.string().min(1).max(500) },
   }, async ({ text }) => {
     authorize();
     return withScreenLock(() => {
       screenIsFresh();
+      if (!lastTargetHandle) throw new Error('Click the intended named window before typing');
       keepScreenIndicatorVisible();
-      return runScreenAction({ action: 'type', text,
+      return runScreenAction({ action: 'type', text, expectedHandle: lastTargetHandle,
         region: { x: lastScreen.originX, y: lastScreen.originY,
           width: lastScreen.width, height: lastScreen.height } });
     });
   });
   server.registerTool('screen_key', {
-    description: 'Press a key or shortcut such as Enter, Escape, Ctrl+A, or Alt+Tab. Requires a recent screenshot; returns a new screenshot.',
+    description: 'Press a key or shortcut in the window focused by screen_click. Refuses if another window has taken focus. Supports Enter, Escape, Ctrl+A, Alt+Tab, and similar keys.',
     inputSchema: { keys: z.string().min(1).max(40) },
   }, async ({ keys }) => {
     authorize();
     return withScreenLock(() => {
       screenIsFresh();
+      if (!lastTargetHandle) throw new Error('Click the intended named window before pressing keys');
       keepScreenIndicatorVisible();
-      return runScreenAction({ action: 'key', keys,
+      return runScreenAction({ action: 'key', keys, expectedHandle: lastTargetHandle,
         region: { x: lastScreen.originX, y: lastScreen.originY,
           width: lastScreen.width, height: lastScreen.height } });
     });
@@ -222,8 +236,9 @@ function createServer(adminRequest) {
     authorize();
     return withScreenLock(() => {
       screenPointIsVisible(x, y);
+      if (!lastTargetHandle) throw new Error('Click the intended named window before scrolling');
       keepScreenIndicatorVisible();
-      return runScreenAction({ action: 'scroll', x, y, steps,
+      return runScreenAction({ action: 'scroll', x, y, steps, expectedHandle: lastTargetHandle,
         region: { x: lastScreen.originX, y: lastScreen.originY,
           width: lastScreen.width, height: lastScreen.height } });
     });

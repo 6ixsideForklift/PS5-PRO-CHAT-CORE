@@ -10,6 +10,7 @@ from pathlib import Path
 
 from PIL import ImageGrab
 import pytesseract
+import win32clipboard
 import win32gui
 
 
@@ -131,11 +132,76 @@ def set_cursor(x, y):
         raise RuntimeError("Windows could not move the cursor")
 
 
+def top_window_at(x, y):
+    handle = win32gui.WindowFromPoint((int(x), int(y)))
+    return win32gui.GetAncestor(handle, 2) if handle else 0
+
+
+def foreground_window():
+    handle = win32gui.GetForegroundWindow()
+    return win32gui.GetAncestor(handle, 2) if handle else 0
+
+
+def activate_window(title, x=None, y=None):
+    matches = []
+    win32gui.EnumWindows(
+        lambda handle, _: matches.append(handle)
+        if win32gui.IsWindowVisible(handle) and win32gui.GetWindowText(handle) == title
+        else None, None)
+    if len(matches) != 1:
+        raise RuntimeError(f"Expected one visible window titled {title!r}; found {len(matches)}")
+    handle = matches[0]
+    if win32gui.IsIconic(handle):
+        win32gui.ShowWindow(handle, 9)  # SW_RESTORE
+    left, top, right, bottom = win32gui.GetWindowRect(handle)
+    if x is not None and not (left <= x < right and top <= y < bottom):
+        raise RuntimeError("Click coordinates are outside the named window; capture again")
+    check_x = x if x is not None else (left + right) // 2
+    check_y = y if y is not None else (top + bottom) // 2
+    if foreground_window() != handle:
+        try:
+            win32gui.SetForegroundWindow(handle)
+        except win32gui.error:
+            pass
+        if foreground_window() != handle:
+            send([key_event(0x12), key_event(0x12, up=True)])
+            win32gui.SetForegroundWindow(handle)
+    for _ in range(10):
+        if foreground_window() == handle and top_window_at(check_x, check_y) == handle:
+            return handle
+        time.sleep(0.1)
+    raise RuntimeError("The named window did not come to the foreground at the click point; no click was sent")
+
+
 def type_text(value):
-    units = value.encode("utf-16-le")
-    for offset in range(0, len(units), 2):
-        code = int.from_bytes(units[offset:offset + 2], "little")
-        send([key_event(code, unicode=True), key_event(code, up=True, unicode=True)])
+    previous = []
+    win32clipboard.OpenClipboard()
+    try:
+        format_id = 0
+        while format_id := win32clipboard.EnumClipboardFormats(format_id):
+            data = win32clipboard.GetClipboardData(format_id)
+            if not isinstance(data, (str, bytes)):
+                raise RuntimeError("Cannot safely preserve the current clipboard; text was not pasted")
+            previous.append((format_id, data))
+    finally:
+        win32clipboard.CloseClipboard()
+    win32clipboard.OpenClipboard()
+    try:
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardData(win32clipboard.CF_UNICODETEXT, value)
+    finally:
+        win32clipboard.CloseClipboard()
+    try:
+        key_combo("Ctrl+V")
+        time.sleep(0.6)
+    finally:
+        win32clipboard.OpenClipboard()
+        try:
+            win32clipboard.EmptyClipboard()
+            for format_id, data in previous:
+                win32clipboard.SetClipboardData(format_id, data)
+        finally:
+            win32clipboard.CloseClipboard()
 
 
 KEYS = {
@@ -219,8 +285,10 @@ def capture(request):
         x1, y1, x2, y2 = win32gui.GetWindowRect(handle)
         if x2 <= left or y2 <= top or x1 >= left + image.width or y1 >= top + image.height:
             return
-        entry = {"title": title[:120], "x": x1, "y": y1,
-                 "width": x2 - x1, "height": y2 - y1}
+        entry = {"title": title, "x": x1, "y": y1,
+                 "width": x2 - x1, "height": y2 - y1,
+                 "foreground": handle == foreground_window(),
+                 "frontmostAtCenter": handle == top_window_at((x1 + x2) // 2, (y1 + y2) // 2)}
         children = []
         def add_child(child, _data):
             if len(children) >= 12 or not win32gui.IsWindowVisible(child):
@@ -242,6 +310,7 @@ def capture(request):
         "originY": top,
         "width": image.width,
         "height": image.height,
+        "foregroundWindow": win32gui.GetWindowText(foreground_window()),
         "text": visible_text[:100],
         "windows": visible_windows[:12],
     }
@@ -328,24 +397,43 @@ def main():
         return
     if PAUSED_FILE.exists():
         raise RuntimeError("Screen control was stopped on the laptop. Use the Resume PS5 Screen Control desktop shortcut.")
-    if action == "click":
+    if action == "capture" and request.get("activate_window_title"):
+        activate_window(request["activate_window_title"])
+    elif action == "click":
+        if request.get("window_title"):
+            target = activate_window(request["window_title"], request["x"], request["y"])
+        else:
+            target = top_window_at(request["x"], request["y"])
+            if not target or target != foreground_window():
+                raise RuntimeError("Click target is not the foreground window; provide its exact window_title")
         set_cursor(request["x"], request["y"])
+        if top_window_at(request["x"], request["y"]) != target or foreground_window() != target:
+            raise RuntimeError("Another window covers the click target; no click was sent")
         down, up = (0x0002, 0x0004) if request.get("button", "left") == "left" else (0x0008, 0x0010)
         for _ in range(request.get("count", 1)):
             send([mouse_event(down), mouse_event(up)])
             time.sleep(0.1)
     elif action == "type":
+        if not request.get("expectedHandle") or foreground_window() != request["expectedHandle"]:
+            raise RuntimeError("The target window lost focus; no text was sent. Capture and click it again")
         type_text(request["text"])
     elif action == "key":
+        if not request.get("expectedHandle") or foreground_window() != request["expectedHandle"]:
+            raise RuntimeError("The target window lost focus; no key was sent. Capture and click it again")
         key_combo(request["keys"])
     elif action == "scroll":
+        if not request.get("expectedHandle") or foreground_window() != request["expectedHandle"] or top_window_at(request["x"], request["y"]) != request["expectedHandle"]:
+            raise RuntimeError("The target window is not in front at the scroll point; capture and click it again")
         set_cursor(request["x"], request["y"])
         send([mouse_event(0x0800, request["steps"] * 120)])
     elif action != "capture":
         raise ValueError(f"Unsupported screen action: {action}")
     if action != "capture":
         time.sleep(0.3)
-    print(json.dumps(capture(request), separators=(",", ":")))
+    result = capture(request)
+    if action == "click":
+        result["activeHandle"] = target
+    print(json.dumps(result, separators=(",", ":")))
 
 
 if __name__ == "__main__":
