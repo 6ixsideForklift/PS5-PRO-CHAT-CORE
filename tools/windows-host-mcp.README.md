@@ -51,6 +51,12 @@ file. Attach `windows-host` only to the private admin agent. The helper offers
 directory listing, UTF-8 file reads and writes, and PowerShell commands. There
 are no path restrictions; commands execute without an approval prompt.
 
+For large CHD collections, `plan_chd_duplicates` inventories one folder and
+writes a complete CSV dry run under the user's temporary `PS5-Pro-Operator`
+directory. It returns counts, a few examples, and ambiguous groups to the
+agent. It does not create a `duplicates` folder or move files. Review the CSV
+and resolve ambiguous games before approving any moves.
+
 ## Screen control
 
 The helper also offers `screen_monitors`, `screen_capture`, `screen_click`,

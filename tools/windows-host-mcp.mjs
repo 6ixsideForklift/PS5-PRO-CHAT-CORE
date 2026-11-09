@@ -13,6 +13,7 @@ if (!config.token || !config.adminUserId) throw new Error('Missing private MCP c
 const port = 8766;
 const app = createMcpExpressApp({ allowedHosts: ['127.0.0.1', 'localhost', 'host.docker.internal'] });
 const screenScript = fileURLToPath(new URL('./windows-screen.py', import.meta.url));
+const romPlanScript = fileURLToPath(new URL('./rom-duplicate-plan.py', import.meta.url));
 const screenPausedFile = fileURLToPath(new URL('../.ps5-screen-paused', import.meta.url));
 let overlayProcess;
 let overlayTimer;
@@ -147,7 +148,7 @@ function createServer(adminRequest) {
     return { content: [{ type: 'text', text: `Wrote ${path}` }] };
   });
   server.registerTool('run_powershell', {
-    description: 'Run a PowerShell command on the host Windows laptop as the signed-in Windows user. Commands run automatically.',
+    description: 'Run a PowerShell command on the host Windows laptop as the signed-in Windows user. Commands run automatically. For a CHD duplicate inventory, call plan_chd_duplicates instead of printing hundreds of filenames.',
     inputSchema: { command: z.string().min(1).max(8000) },
   }, async ({ command }) => {
     authorize();
@@ -162,6 +163,26 @@ function createServer(adminRequest) {
       child.on('close', (code, signal) => resolve(`Exit code: ${code ?? signal}\n${output}`));
     });
     return { content: [{ type: 'text', text: result }] };
+  });
+  server.registerTool('plan_chd_duplicates', {
+    description: 'Create a review-only dry-run plan for CHD games in one Windows folder. Groups regions, revisions, and multi-disc releases, prefers final USA, flags uncertain editions, and saves the complete CSV manifest locally. Returns compact counts and examples. Does not move or delete games or create a duplicates folder. Use this before asking Brian to approve moves; do not list every filename in chat.',
+    inputSchema: { path: z.string().min(1) },
+  }, async ({ path }) => {
+    authorize();
+    const result = await new Promise((resolve, reject) => {
+      const child = spawn('python', [romPlanScript], { windowsHide: true, timeout: 30_000 });
+      let output = '';
+      let errors = '';
+      child.stdout.on('data', (data) => { output += data.toString(); });
+      child.stderr.on('data', (data) => { errors = (errors + data.toString()).slice(0, 1000); });
+      child.on('error', reject);
+      child.on('close', (code) => {
+        if (code !== 0) return reject(new Error(errors || output.slice(0, 500)));
+        try { resolve(JSON.parse(output)); } catch { reject(new Error('Invalid duplicate plan response')); }
+      });
+      child.stdin.end(JSON.stringify({ path }));
+    });
+    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
   });
   server.registerTool('screen_capture', {
     description: 'Read exact Windows accessibility labels and bounds for a named app, with OCR fallback. Call screen_monitors to find its title. With activate_window_title, bring the window in front and move it to the requested monitor (primary by default), then read that window only. Prefer screen_click_control by exact label; use OCR positions only if controls are unavailable. Set move_to_capture_monitor=false to keep its current monitor. Starts visible control banners.',
