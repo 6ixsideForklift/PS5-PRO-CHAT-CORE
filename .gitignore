@@ -193,6 +193,9 @@ scripts/activity-labels/results/
 /.lighthouse/
 /e2e/lighthouse/.test-results/
 /e2e/rum/.test-results/
+/.ps5-windows-mcp.json
+/.ps5-windows-mcp.log
+/.ps5-windows-mcp.err
 # Chrome user-data directories a Lighthouse run leaves in the repository root when the browser
 # is handed a Windows profile path from WSL: the whole path arrives as one directory name.
 /*lighthouse.[0-9]*/
