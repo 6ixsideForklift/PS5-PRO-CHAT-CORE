@@ -24,7 +24,7 @@
 .ps5-auth-skyline {
   height: clamp(190px, 29vh, 310px);
   flex-shrink: 0;
-  background: #090909 url('/assets/ps5-pro-chat-banner.svg') center / 100% 100% no-repeat;
+  background: #090909 url('/assets/ps5-pro-chat-banner.png') center / 100% 100% no-repeat;
   box-shadow: 0 12px 35px #000;
 }
 
@@ -72,12 +72,17 @@
 }
 
 .ps5-auth-card h1 { color: #fff !important; font-size: clamp(1.4rem, 2.6vw, 2rem) !important; font-weight: 500 !important; }
-.ps5-auth-card input { background: #1a1d21 !important; color: #fff !important; border-color: #777 !important; }
+.ps5-auth-shell .ps5-auth-card input#email,
+.ps5-auth-shell .ps5-auth-card input#password { background: #1a1d21 !important; color: #fff !important; border: 1px solid #777 !important; }
+.ps5-auth-shell .ps5-auth-card input#email + label,
+.ps5-auth-shell .ps5-auth-card input#password + label { color: #bbb !important; }
 .ps5-auth-card input:focus { border-color: var(--ps5-gold) !important; outline-color: var(--ps5-gold) !important; }
 .ps5-auth-card button[type='submit'] { background: var(--ps5-gold) !important; color: #080a0d !important; border-color: var(--ps5-gold) !important; font-weight: 800 !important; }
 .ps5-auth-card button[type='submit']:hover { background: #ffd760 !important; }
 .ps5-auth-card a { color: var(--ps5-gold) !important; }
 .ps5-auth-card p:has(a[href='/register']) { border-top: 1px solid #737373; padding-top: 16px; }
+.ps5-auth-card a[href='/register'] { display: block; margin-top: 12px; padding: 10px; border: 1px solid var(--ps5-gold); border-radius: 9px; font-size: 1rem; font-weight: 700; text-decoration: none; }
+.ps5-auth-card a[href='/register']:hover { background: #ffc11920; }
 .ps5-auth-shell footer { color: #bbb; }
 
 @media (max-width: 640px) {

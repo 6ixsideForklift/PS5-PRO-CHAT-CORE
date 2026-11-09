@@ -471,6 +471,7 @@
   "com_auth_saml_login": "Continue with SAML",
   "com_auth_sign_in": "Sign in",
   "com_auth_ps5_sign_in": "Sign in to PS5 PRO CHAT",
+  "com_auth_ps5_create_account": "Create an account",
   "com_auth_sign_up": "Sign up",
   "com_auth_submit_registration": "Submit registration",
   "com_auth_to_reset_your_password": "to reset your password.",
