@@ -111,6 +111,39 @@ def monitors():
     return found
 
 
+def monitor_for_rect(rect, options):
+    left, top, right, bottom = rect
+    ranked = []
+    for monitor in options:
+        overlap_width = max(0, min(right, monitor["x"] + monitor["width"]) - max(left, monitor["x"]))
+        overlap_height = max(0, min(bottom, monitor["y"] + monitor["height"]) - max(top, monitor["y"]))
+        ranked.append((overlap_width * overlap_height, monitor["index"]))
+    best_area, best_index = max(ranked, default=(0, None))
+    return best_index if best_area else None
+
+
+def window_inventory(options=None):
+    options = options or monitors()
+    entries = []
+
+    def add_window(handle, _data):
+        if not win32gui.IsWindowVisible(handle):
+            return
+        title = win32gui.GetWindowText(handle)
+        if not title or title == "PS5 PRO OPERATOR - SCREEN CONTROL ACTIVE":
+            return
+        minimized = bool(win32gui.IsIconic(handle))
+        rect = win32gui.GetWindowPlacement(handle)[4] if minimized else win32gui.GetWindowRect(handle)
+        index = monitor_for_rect(rect, options)
+        if index is None:
+            return
+        entries.append({"title": title, "monitor": index, "minimized": minimized,
+                        "foreground": handle == foreground_window(), "rect": rect})
+
+    win32gui.EnumWindows(add_window, None)
+    return entries[:40]
+
+
 def send(inputs):
     events = (Input * len(inputs))(*inputs)
     count = user32.SendInput(len(events), events, ctypes.sizeof(Input))
@@ -143,11 +176,16 @@ def foreground_window():
 
 
 def activate_window(title, x=None, y=None):
-    matches = []
-    win32gui.EnumWindows(
-        lambda handle, _: matches.append(handle)
-        if win32gui.IsWindowVisible(handle) and win32gui.GetWindowText(handle) == title
-        else None, None)
+    deadline = time.monotonic() + 8
+    while True:
+        matches = []
+        win32gui.EnumWindows(
+            lambda handle, _: matches.append(handle)
+            if win32gui.IsWindowVisible(handle) and win32gui.GetWindowText(handle) == title
+            else None, None)
+        if matches or time.monotonic() >= deadline:
+            break
+        time.sleep(0.25)
     if len(matches) != 1:
         raise RuntimeError(f"Expected one visible window titled {title!r}; found {len(matches)}")
     handle = matches[0]
@@ -171,6 +209,35 @@ def activate_window(title, x=None, y=None):
             return handle
         time.sleep(0.1)
     raise RuntimeError("The named window did not come to the foreground at the click point; no click was sent")
+
+
+def move_window_to_monitor(handle, target_index):
+    options = monitors()
+    if not isinstance(target_index, int) or target_index < 0 or target_index >= len(options):
+        raise ValueError("Unknown target monitor index; call screen_monitors first")
+    source_index = monitor_for_rect(win32gui.GetWindowRect(handle), options)
+    if source_index == target_index:
+        return None
+    if win32gui.GetWindowPlacement(handle)[1] == 3:  # SW_SHOWMAXIMIZED
+        win32gui.ShowWindow(handle, 9)  # Restore before moving a maximized window.
+    left, top, right, bottom = win32gui.GetWindowRect(handle)
+    target = options[target_index]
+    width = min(right - left, target["width"] - 80)
+    height = min(bottom - top, target["height"] - 100)
+    if width < 100 or height < 100:
+        raise RuntimeError("The target monitor is too small for this window")
+    x = target["x"] + (target["width"] - width) // 2
+    y = target["y"] + (target["height"] - height) // 2
+    win32gui.MoveWindow(handle, x, y, width, height, True)
+    for _ in range(15):
+        actual = win32gui.GetWindowRect(handle)
+        center_x = (actual[0] + actual[2]) // 2
+        center_y = (actual[1] + actual[3]) // 2
+        if (monitor_for_rect(actual, options) == target_index and foreground_window() == handle
+                and top_window_at(center_x, center_y) == handle):
+            return source_index
+        time.sleep(0.1)
+    raise RuntimeError("The moved window is not visibly in front on the requested monitor")
 
 
 def type_text(value):
@@ -233,8 +300,13 @@ def key_combo(value):
 def capture(request):
     region = request.get("region")
     monitor = request.get("monitor")
+    options = monitors()
+    if (monitor is None and region is None and request.get("scope") != "all"
+            and request.get("_activated_handle")):
+        monitor = monitor_for_rect(win32gui.GetWindowRect(request["_activated_handle"]), options)
+        if monitor is None:
+            raise RuntimeError("The activated window is outside all connected monitors")
     if monitor is not None:
-        options = monitors()
         if not isinstance(monitor, int) or monitor < 0 or monitor >= len(options):
             raise ValueError("Unknown monitor index; call screen_monitors first")
         region = options[monitor]
@@ -287,6 +359,7 @@ def capture(request):
             return
         entry = {"title": title, "x": x1, "y": y1,
                  "width": x2 - x1, "height": y2 - y1,
+                 "monitor": monitor_for_rect((x1, y1, x2, y2), options),
                  "foreground": handle == foreground_window(),
                  "frontmostAtCenter": handle == top_window_at((x1 + x2) // 2, (y1 + y2) // 2)}
         children = []
@@ -305,14 +378,24 @@ def capture(request):
             entry["controls"] = children
         visible_windows.append(entry)
     win32gui.EnumWindows(add_window, None)
+    other_windows = [entry for entry in window_inventory(options)
+                     if not (entry["rect"][2] > left and entry["rect"][3] > top
+                             and entry["rect"][0] < left + image.width
+                             and entry["rect"][1] < top + image.height)]
     return {
         "originX": left,
         "originY": top,
         "width": image.width,
         "height": image.height,
+        "monitorIndex": monitor if monitor is not None else (
+            "all" if request.get("scope") == "all" else
+            monitor_for_rect((left, top, left + image.width, top + image.height), options)),
+        "movedFromMonitor": request.get("_moved_from_monitor"),
         "foregroundWindow": win32gui.GetWindowText(foreground_window()),
         "text": visible_text[:100],
         "windows": visible_windows[:12],
+        "otherMonitorWindows": [{key: entry[key] for key in ("title", "monitor", "minimized", "foreground")}
+                                for entry in other_windows[:24]],
     }
 
 
@@ -393,12 +476,31 @@ def main():
     request = json.load(sys.stdin)
     action = request.get("action")
     if action == "monitors":
-        print(json.dumps({"monitors": monitors()}, separators=(",", ":")))
+        options = monitors()
+        print(json.dumps({"monitors": options,
+                          "windows": [{key: entry[key] for key in ("title", "monitor", "minimized", "foreground")}
+                                      for entry in window_inventory(options)]}, separators=(",", ":")))
         return
     if PAUSED_FILE.exists():
         raise RuntimeError("Screen control was stopped on the laptop. Use the Resume PS5 Screen Control desktop shortcut.")
     if action == "capture" and request.get("activate_window_title"):
-        activate_window(request["activate_window_title"])
+        handle = activate_window(request["activate_window_title"])
+        request["_activated_handle"] = handle
+        if request.get("scope") != "all" and request.get("move_to_capture_monitor", True):
+            target_monitor = request.get("monitor")
+            if target_monitor is None and request.get("region"):
+                region = request["region"]
+                bounds = (region["x"], region["y"], region["x"] + region["width"],
+                          region["y"] + region["height"])
+                target_monitor = monitor_for_rect(bounds, monitors())
+            if target_monitor is None:
+                target_monitor = 0
+            request["_moved_from_monitor"] = move_window_to_monitor(handle, target_monitor)
+            request["monitor"] = target_monitor
+            request.pop("region", None)
+        elif request.get("scope") != "all" and not request.get("move_to_capture_monitor", True):
+            request["monitor"] = None
+            request.pop("region", None)
     elif action == "click":
         if request.get("window_title"):
             target = activate_window(request["window_title"], request["x"], request["y"])

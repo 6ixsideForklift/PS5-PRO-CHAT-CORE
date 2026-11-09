@@ -105,7 +105,7 @@ async function runScreenAction(request) {
   if (request.action === 'click') lastTargetHandle = result.activeHandle;
   keepScreenIndicatorVisible();
   return { content: [
-    { type: 'text', text: `Screen origin (${result.originX}, ${result.originY}); size ${result.width} × ${result.height}. Foreground window: ${result.foregroundWindow}. Coordinates are absolute Windows desktop pixels. OCR text and window/control rectangles: ${JSON.stringify({ text: result.text, windows: result.windows })}` },
+    { type: 'text', text: `Viewing monitor ${result.monitorIndex}; screen origin (${result.originX}, ${result.originY}); size ${result.width} × ${result.height}. ${result.movedFromMonitor == null ? '' : `Moved target here from monitor ${result.movedFromMonitor}. `}Foreground window: ${result.foregroundWindow}. Coordinates are absolute Windows desktop pixels. OCR text and window/control rectangles: ${JSON.stringify({ text: result.text, windows: result.windows, otherMonitorWindows: result.otherMonitorWindows })}` },
   ] };
 }
 
@@ -163,29 +163,30 @@ function createServer(adminRequest) {
     return { content: [{ type: 'text', text: result }] };
   });
   server.registerTool('screen_capture', {
-    description: 'Read the Windows desktop as OCR text and window/control rectangles. Windows marked foreground/frontmostAtCenter are visibly in front. To bring a taskbar-only or covered window onto the screen first, pass its exact title as activate_window_title. Default is primary monitor. Starts visible control banners. Use before screen actions.',
+    description: 'Read OCR text and window/control rectangles. Call screen_monitors to find an app title. With activate_window_title, restore and bring the window in front, moving it to the requested monitor (primary monitor by default) before capture. Set move_to_capture_monitor=false to keep it on its current monitor. Other-monitor window titles are included. Starts visible control banners.',
     inputSchema: { scope: z.enum(['primary', 'all']).default('primary'),
       monitor: z.number().int().min(0).optional(),
       activate_window_title: z.string().min(1).optional(),
+      move_to_capture_monitor: z.boolean().default(true),
       region: z.object({ x: z.number().int(), y: z.number().int(),
         width: z.number().int().min(1), height: z.number().int().min(1) }).optional() },
-  }, async ({ scope, monitor, region, activate_window_title }) => {
+  }, async ({ scope, monitor, region, activate_window_title, move_to_capture_monitor }) => {
     authorize();
     return withScreenLock(() => {
       if (activate_window_title) {
         requireScreenEnabled();
         keepScreenIndicatorVisible();
       }
-      return runScreenAction({ action: 'capture', scope, monitor, region, activate_window_title });
+      return runScreenAction({ action: 'capture', scope, monitor, region, activate_window_title, move_to_capture_monitor });
     });
   });
   server.registerTool('screen_monitors', {
-    description: 'List connected monitors with their index and absolute Windows desktop coordinates. Does not take a screenshot.',
+    description: 'List connected monitors and visible window titles with each window’s monitor index, minimized status, and foreground status. Use this to find where a newly opened app landed. Does not take a screenshot.',
     inputSchema: {},
   }, async () => {
     authorize();
     const result = await runScreenProcess({ action: 'monitors' });
-    return { content: [{ type: 'text', text: JSON.stringify(result.monitors) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
   });
   server.registerTool('screen_click', {
     description: 'Click within a named window at absolute desktop coordinates from a recent capture. Give the exact window_title shown by capture. Restores and foregrounds that window, verifies it is visibly at the click point, then clicks. Refuses if another window covers it.',

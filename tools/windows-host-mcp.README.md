@@ -81,6 +81,13 @@ and restores supported clipboard formats; it refuses to paste when the current
 clipboard cannot be safely preserved. Verify saved files separately before
 reporting success.
 
+`screen_monitors` also lists visible window titles and the monitor each belongs
+to. When `activate_window_title` is provided, the capture waits briefly for a
+newly launched window and moves it to the monitor the agent selected. If no
+monitor was selected, it uses the primary monitor. Set
+`move_to_capture_monitor: false` to leave the window on its current monitor.
+The returned coordinates reflect its new location; use those for later clicks.
+
 Screen actions run as the signed-in Windows user and cannot control elevated
 windows or the Windows secure desktop. Only the private admin agent should use
 this server; the standard USER role must retain MCP Use disabled.
