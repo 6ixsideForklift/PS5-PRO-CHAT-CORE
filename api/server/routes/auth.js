@@ -7,15 +7,17 @@ const {
   createTwoFactorManagementLimiter,
   forceRefreshCloudFrontAuthCookies,
   blockTwoFactorDisableWhenRequired,
+  createSupabaseAuthHandlers,
+  getBalanceConfig,
   requireTwoFactorSetupAcknowledgementToken,
   requireTwoFactorSetupFinalizationToken,
 } = require('@librechat/api');
 const {
-  resetPasswordRequestController,
-  resetPasswordController,
   registrationController,
   graphTokenController,
   refreshController,
+  resetPasswordRequestController,
+  resetPasswordController,
 } = require('~/server/controllers/AuthController');
 const {
   regenerateBackupCodes,
@@ -41,7 +43,15 @@ const {
 } = require('~/server/controllers/auth/TwoFactorAuthController');
 const { logoutController } = require('~/server/controllers/auth/LogoutController');
 const { loginController } = require('~/server/controllers/auth/LoginController');
-const { findBalanceByUser, upsertBalanceFields } = require('~/models');
+const { registerSchema } = require('~/strategies/validators');
+const {
+  findBalanceByUser,
+  upsertBalanceFields,
+  findUser,
+  createUserIfAbsent,
+  countUsers,
+  deleteAllUserSessions,
+} = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
 const middleware = require('~/server/middleware');
 
@@ -66,6 +76,21 @@ const getCloudFrontAuthCookieRefreshResult = (req, res) => {
 };
 
 const ldapAuth = !!process.env.LDAP_URL && !!process.env.LDAP_USER_SEARCH_BASE;
+const supabaseAuth =
+  process.env.SUPABASE_AUTH_URL && process.env.SUPABASE_AUTH_PUBLISHABLE_KEY
+    ? createSupabaseAuthHandlers({
+        url: process.env.SUPABASE_AUTH_URL,
+        publishableKey: process.env.SUPABASE_AUTH_PUBLISHABLE_KEY,
+        getAppConfig,
+        getBalanceConfig,
+        findUser,
+        createUserIfAbsent,
+        findBalanceByUser,
+        countUsers,
+        deleteAllUserSessions,
+        registrationSchema: registerSchema,
+      })
+    : null;
 //Local
 router.post('/logout', middleware.requireJwtAuth, logoutController);
 router.post(
@@ -76,7 +101,7 @@ router.post(
   middleware.loginLimiter,
   middleware.checkBan,
   middleware.validateEmailLogin,
-  ldapAuth ? middleware.requireLdapAuth : middleware.requireLocalAuth,
+  supabaseAuth?.login ?? (ldapAuth ? middleware.requireLdapAuth : middleware.requireLocalAuth),
   setBalanceConfig,
   loginController,
 );
@@ -101,7 +126,7 @@ router.post(
   middleware.checkBan,
   middleware.checkInviteUser,
   middleware.validateRegistration,
-  registrationController,
+  supabaseAuth?.register ?? registrationController,
 );
 router.post(
   '/requestPasswordReset',
@@ -109,15 +134,16 @@ router.post(
   middleware.resetPasswordLimiter,
   middleware.checkBan,
   middleware.validatePasswordReset,
-  resetPasswordRequestController,
+  supabaseAuth?.requestPasswordReset ?? resetPasswordRequestController,
 );
 router.post(
   '/resetPassword',
   requirePreAuthTenantContext,
+  ...(supabaseAuth ? [middleware.requireSameOrigin] : []),
   middleware.resetPasswordSubmissionLimiter,
   middleware.checkBan,
   middleware.validatePasswordReset,
-  resetPasswordController,
+  supabaseAuth?.resetPassword ?? resetPasswordController,
 );
 
 router.post('/2fa/enable', middleware.requireJwtAuth, twoFactorManagementLimiter, enable2FA);

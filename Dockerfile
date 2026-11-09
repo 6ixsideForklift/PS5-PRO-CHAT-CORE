@@ -59,10 +59,11 @@ RUN \
 COPY --chown=node:node . .
 
 ARG VITE_MCP_SANDBOX_URL=
+ARG SKIP_NPM_PRUNE=false
 RUN \
     # React client build with configurable memory
     NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run frontend && \
-    npm prune --production && \
+    if [ "$SKIP_NPM_PRUNE" != "true" ]; then npm prune --production; fi && \
     npm cache clean --force
 
 # Optional build metadata surfaced in Settings -> About for support triage.

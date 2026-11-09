@@ -23,6 +23,12 @@ const oauthErrorKeys: Record<string, TranslationKeys> = {
 };
 
 function Login() {
+  useEffect(() => {
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    if (fragment.has('access_token') && fragment.has('refresh_token')) {
+      history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+  }, []);
   const localize = useLocalize();
   const { showToast } = useToastContext();
   const { error, setError, login } = useAuthContext();
@@ -88,7 +94,9 @@ function Login() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <p className="text-lg font-semibold">
-          {localize('com_ui_redirecting_to_provider', { 0: startupConfig.openidLabel })}
+          {localize('com_ui_redirecting_to_provider', {
+            0: startupConfig.openidLabel,
+          })}
         </p>
         <div className="mt-4">
           <SocialButton

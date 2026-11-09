@@ -7,6 +7,8 @@ services:
     build:
       context: .
       target: node
+      args:
+        SKIP_NPM_PRUNE: "true"
     ports: !override
       - "127.0.0.1:3081:3080"
     volumes:

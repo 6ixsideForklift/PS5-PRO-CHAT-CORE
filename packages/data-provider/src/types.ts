@@ -779,6 +779,7 @@ export type TTokenConfigMap = Record<string, Record<string, TModelTokenomics>>;
 
 export type TRegisterUserResponse = {
   message: string;
+  requiresEmailConfirmation?: boolean;
 };
 
 export type TRegisterUser = {

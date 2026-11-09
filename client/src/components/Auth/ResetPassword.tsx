@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useOutletContext } from 'react-router-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -19,9 +20,41 @@ function ResetPassword() {
   const [params] = useSearchParams();
   const password = watch('password');
   const resetPassword = useResetPasswordMutation();
+  const [supabaseSuccess, setSupabaseSuccess] = useState(false);
   const { setError, setHeaderText, startupConfig } = useOutletContext<TLoginLayoutContext>();
+  const recovery = new URLSearchParams(window.location.hash.slice(1));
+  const isSupabaseRecovery = recovery.get('type') === 'recovery';
 
-  const onSubmit = (data: TResetPassword) => {
+  const onSubmit = async (data: TResetPassword) => {
+    if (isSupabaseRecovery) {
+      const accessToken = recovery.get('access_token');
+      const refreshToken = recovery.get('refresh_token');
+      if (!accessToken || !refreshToken) {
+        setError('com_auth_error_invalid_reset_token');
+        return;
+      }
+      try {
+        const response = await fetch('/api/auth/resetPassword', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accessToken,
+            refreshToken,
+            password: data.password,
+          }),
+        });
+        if (!response.ok) {
+          setError('com_auth_error_invalid_reset_token');
+          return;
+        }
+        history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+        setSupabaseSuccess(true);
+        setHeaderText('com_auth_reset_password_success');
+      } catch {
+        setError('com_auth_error_invalid_reset_token');
+      }
+      return;
+    }
     resetPassword.mutate(data, {
       onError: () => {
         setError('com_auth_error_invalid_reset_token');
@@ -32,7 +65,7 @@ function ResetPassword() {
     });
   };
 
-  if (resetPassword.isSuccess) {
+  if (resetPassword.isSuccess || supabaseSuccess) {
     return (
       <>
         <Alert variant="success" icon={false} elevation="raised" size="roomy" className="mt-6">
@@ -66,13 +99,17 @@ function ResetPassword() {
             type="hidden"
             id="token"
             value={params.get('token') ?? ''}
-            {...register('token', { required: 'Unable to process: No valid reset token' })}
+            {...register('token', {
+              required: isSupabaseRecovery ? false : 'Unable to process: No valid reset token',
+            })}
           />
           <input
             type="hidden"
             id="userId"
             value={params.get('userId') ?? ''}
-            {...register('userId', { required: 'Unable to process: No valid user id' })}
+            {...register('userId', {
+              required: isSupabaseRecovery ? false : 'Unable to process: No valid user id',
+            })}
           />
           <SecretInput
             colorTransition

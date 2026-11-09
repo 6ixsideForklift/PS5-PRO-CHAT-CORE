@@ -31,6 +31,7 @@ export * from './localRefresh';
 export * from './openid/reuseCredential';
 export * from './passwordResetUpdate';
 export * from './login';
+export * from './supabase';
 export * from './enrollment';
 export * from './gates';
 export * from './share';

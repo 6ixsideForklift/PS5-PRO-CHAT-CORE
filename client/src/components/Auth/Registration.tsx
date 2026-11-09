@@ -36,6 +36,7 @@ const Registration: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [countdown, setCountdown] = useState<number>(3);
+  const [requiresEmailConfirmation, setRequiresEmailConfirmation] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const location = useLocation();
@@ -50,8 +51,12 @@ const Registration: React.FC = () => {
     onMutate: () => {
       setIsSubmitting(true);
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
       setIsSubmitting(false);
+      if (response.requiresEmailConfirmation) {
+        setRequiresEmailConfirmation(true);
+        return;
+      }
       setCountdown(3);
       const timer = setInterval(() => {
         setCountdown((prevCountdown) => {
@@ -132,18 +137,22 @@ const Registration: React.FC = () => {
           {localize('com_auth_error_create')} {errorMessage}
         </ErrorMessage>
       )}
-      {registerUser.isSuccess && countdown > 0 && (
+      {registerUser.isSuccess && (requiresEmailConfirmation || countdown > 0) && (
         <div
           className="border-status-success-border bg-status-success-subtle text-text-secondary rounded-md border px-3 py-2 text-sm"
           role="alert"
         >
-          {localize(
-            startupConfig?.emailEnabled
-              ? 'com_auth_registration_success_generic'
-              : 'com_auth_registration_success_insecure',
-          ) +
-            ' ' +
-            localize('com_auth_email_verification_redirecting', { 0: countdown.toString() })}
+          {requiresEmailConfirmation
+            ? localize('com_auth_registration_success_generic')
+            : localize(
+                startupConfig?.emailEnabled
+                  ? 'com_auth_registration_success_generic'
+                  : 'com_auth_registration_success_insecure',
+              ) +
+              ' ' +
+              localize('com_auth_email_verification_redirecting', {
+                0: countdown.toString(),
+              })}
         </div>
       )}
       {!startupConfigError && !isFetching && (
