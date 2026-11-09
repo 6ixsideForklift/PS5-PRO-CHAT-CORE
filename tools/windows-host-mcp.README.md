@@ -7,11 +7,19 @@ disabled. Keep the agent private; do not share it with other users.
 
 ## Start after signing in to Windows
 
+The `PS5 PRO CHAT Startup` shortcut in the current user's Windows Startup folder
+runs `start-ps5-pro-chat.ps1` at sign-in. It starts this helper, launches Docker
+Desktop if needed, and brings up the existing Compose project. Startup activity
+is recorded in the ignored `.ps5-startup.log` file. The desktop `PS5 PRO CHAT`
+shortcut opens `http://localhost:3081/`.
+
+To start it manually:
+
 From PowerShell:
 
 ```powershell
 Set-Location E:\PS5-PRO-CHAT-CORE
-.\tools\start-windows-host-mcp.ps1
+.\tools\start-ps5-pro-chat.ps1
 ```
 
 The script needs the ignored `.ps5-windows-mcp.json` file created during local
