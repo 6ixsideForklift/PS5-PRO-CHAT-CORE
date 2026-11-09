@@ -176,7 +176,7 @@ const LoginForm: React.FC<TLoginFormProps> = ({ onSubmit, startupConfig, error, 
 
         <div className="mt-6">
           <Button
-            aria-label={localize('com_auth_continue')}
+            aria-label={localize('com_auth_sign_in')}
             data-testid="login-button"
             type="submit"
             disabled={(requireCaptcha && !turnstileToken) || isSubmitting}
@@ -185,7 +185,7 @@ const LoginForm: React.FC<TLoginFormProps> = ({ onSubmit, startupConfig, error, 
             size="auth"
             className="w-full"
           >
-            {isSubmitting ? <Spinner /> : localize('com_auth_continue')}
+            {isSubmitting ? <Spinner /> : localize('com_auth_sign_in')}
           </Button>
         </div>
       </form>

@@ -92,7 +92,17 @@ function AuthLayout({
     <div className="ps5-auth-shell bg-surface-primary relative flex min-h-screen flex-col">
       <Banner />
       <div className="ps5-auth-skyline" role="img" aria-label="Toronto skyline at sunset, PS5 PRO CHAT" />
-      <div className="ps5-auth-brand"><span className="ps5-auth-mark" aria-hidden="true">✦</span><strong>PS5 PRO CHAT</strong><small>AI · PS5 PRO · TOOLS · AUTOMATION</small></div>
+      <div className="ps5-auth-brand">
+        <svg className="ps5-auth-mark" viewBox="0 0 84 84" fill="none" aria-hidden="true">
+          <rect x="7" y="16" width="62" height="48" rx="18" stroke="currentColor" strokeWidth="5" />
+          <path d="M28 64 20 74V62M48 64l12 10V62" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
+          <circle cx="28" cy="40" r="4" fill="currentColor" />
+          <circle cx="41" cy="40" r="4" fill="currentColor" />
+          <circle cx="54" cy="40" r="4" fill="currentColor" />
+          <path d="M38 16V8m-5 0h10" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+        </svg>
+        <div><strong>PS5 PRO CHAT</strong><small>AI · PS5 PRO · TOOLS · AUTOMATION</small></div>
+      </div>
       <BlinkAnimation active={isFetching}>
         <div className="ps5-auth-original-logo mt-6 h-10 w-full bg-cover">
           <img
@@ -116,7 +126,7 @@ function AuthLayout({
         >
           {!hasStartupConfigError && !isFetching && header && (
             <h1 className="text-text-primary mb-4 text-center text-3xl font-semibold select-none">
-              {header}
+              {isLogin ? localize('com_auth_ps5_sign_in') : header}
             </h1>
           )}
           {children}

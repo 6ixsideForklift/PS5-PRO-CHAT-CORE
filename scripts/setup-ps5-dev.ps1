@@ -16,6 +16,7 @@ $changes = @{
     DOMAIN_CLIENT = 'http://localhost:3081'
     DOMAIN_SERVER = 'http://localhost:3081'
     ADMIN_PANEL_PORT = '3001'
+    APP_TITLE = 'PS5 PRO CHAT'
     JWT_SECRET = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
     JWT_REFRESH_SECRET = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
     CREDS_KEY = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))

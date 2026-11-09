@@ -1,19 +1,91 @@
-/* PS5 PRO CHAT auth theme. Scoped to auth layout only. */
-.ps5-auth-shell{--ps5-gold:#ffbf12;--ps5-ink:#080a0d;background:#080a0d!important;color:#f5f5f5;isolation:isolate}
-.ps5-auth-shell::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 38%,#5136002b,transparent 50%),repeating-linear-gradient(125deg,transparent 0 74px,#f9ba0810 75px 76px,transparent 77px 140px);z-index:-1}
-.ps5-auth-skyline{height:clamp(120px,19vh,210px);flex-shrink:0;background:#090909 url('/assets/ps5-pro-chat-banner.svg') center 48%/cover no-repeat;border-bottom:2px solid #e9a500;box-shadow:0 12px 36px #000}
-.ps5-auth-brand{display:flex;flex-direction:column;align-items:center;gap:7px;margin:20px auto 0;text-align:center}
-.ps5-auth-brand strong{font-size:clamp(1.8rem,4vw,3.6rem);font-weight:900;letter-spacing:.09em;font-style:italic;line-height:1.1;color:#f7f7f7;text-shadow:0 2px 20px #000}
-.ps5-auth-brand small{font-size:clamp(.7rem,1.5vw,1rem);letter-spacing:.27em;color:#f9c537}
-.ps5-auth-mark{color:#ffbf12;font-size:1.4rem}
-.ps5-auth-original-logo{display:none}
-.ps5-auth-shell main{padding:24px 16px 48px;align-items:flex-start}
-.ps5-auth-card{background:#0d0f12!important;border:1px solid #e7a900;border-radius:20px!important;box-shadow:0 0 0 1px #ffbf1230,0 20px 60px #000a,0 0 32px #b87a001c;padding:28px!important;width:min(100%,520px)!important;max-width:520px!important}
-.ps5-auth-card h1{color:#fff!important;font-weight:700!important;font-size:clamp(1.35rem,2.6vw,1.8rem)!important}
-.ps5-auth-card input{background:#171a1e!important;color:#fff!important;border-color:#555!important}
-.ps5-auth-card input:focus{border-color:#ffc21a!important;outline-color:#ffc21a!important}
-.ps5-auth-card button[type="submit"]{background:#ffbf12!important;color:#080a0d!important;border-color:#ffbf12!important;font-weight:800!important}
-.ps5-auth-card button[type="submit"]:hover{background:#ffd45b!important}
-.ps5-auth-card a{color:#ffc522!important}
-.ps5-auth-shell footer{color:#b9b9b9}
-@media(max-width:640px){.ps5-auth-skyline{height:115px}.ps5-auth-brand{margin-top:15px}.ps5-auth-brand small{letter-spacing:.1em}.ps5-auth-card{padding:20px!important}.ps5-auth-shell main{padding-top:22px}}
+.ps5-auth-shell {
+  --ps5-gold: #ffc119;
+  background: radial-gradient(ellipse at 50% 42%, #242021 0, #090b0e 58%, #050608 100%) !important;
+  color: #f7f7f7;
+  overflow: hidden;
+}
+
+.ps5-auth-shell::before,
+.ps5-auth-shell::after {
+  content: '';
+  position: absolute;
+  top: 34%;
+  width: 45vw;
+  height: 65vh;
+  border-top: 10px solid var(--ps5-gold);
+  border-radius: 50%;
+  box-shadow: 0 -15px 30px #fcb91545, inset 0 13px 35px #ffbe1424;
+  pointer-events: none;
+}
+
+.ps5-auth-shell::before { left: -26vw; transform: rotate(24deg); }
+.ps5-auth-shell::after { right: -26vw; transform: rotate(-24deg); }
+
+.ps5-auth-skyline {
+  height: clamp(190px, 29vh, 310px);
+  flex-shrink: 0;
+  background: #090909 url('/assets/ps5-pro-chat-banner.svg') center / 100% 100% no-repeat;
+  box-shadow: 0 12px 35px #000;
+}
+
+.ps5-auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  margin: 12px auto 0;
+  text-align: left;
+  z-index: 1;
+}
+
+.ps5-auth-brand strong {
+  display: block;
+  color: #fff;
+  font-size: clamp(2rem, 5vw, 4.8rem);
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: .035em;
+  line-height: 1.05;
+  text-shadow: 0 3px 20px #000;
+}
+
+.ps5-auth-brand small {
+  display: block;
+  margin-top: 8px;
+  color: #fff;
+  font-size: clamp(.7rem, 1.4vw, 1.2rem);
+  letter-spacing: .2em;
+}
+
+.ps5-auth-mark { width: clamp(60px, 7vw, 112px); color: #fff; filter: drop-shadow(7px 5px 0 #ffc119); }
+.ps5-auth-original-logo { display: none; }
+.ps5-auth-shell main { padding: 20px 16px 54px; align-items: flex-start; z-index: 1; }
+
+.ps5-auth-card {
+  width: min(100%, 770px) !important;
+  max-width: 770px !important;
+  padding: 24px clamp(24px, 4vw, 64px) !important;
+  background: linear-gradient(145deg, #17191ce8, #0a0b0eea) !important;
+  border: 2px solid var(--ps5-gold);
+  border-radius: 24px !important;
+  box-shadow: 0 0 18px #ffc1195c, 0 20px 60px #000c;
+}
+
+.ps5-auth-card h1 { color: #fff !important; font-size: clamp(1.4rem, 2.6vw, 2rem) !important; font-weight: 500 !important; }
+.ps5-auth-card input { background: #1a1d21 !important; color: #fff !important; border-color: #777 !important; }
+.ps5-auth-card input:focus { border-color: var(--ps5-gold) !important; outline-color: var(--ps5-gold) !important; }
+.ps5-auth-card button[type='submit'] { background: var(--ps5-gold) !important; color: #080a0d !important; border-color: var(--ps5-gold) !important; font-weight: 800 !important; }
+.ps5-auth-card button[type='submit']:hover { background: #ffd760 !important; }
+.ps5-auth-card a { color: var(--ps5-gold) !important; }
+.ps5-auth-card p:has(a[href='/register']) { border-top: 1px solid #737373; padding-top: 16px; }
+.ps5-auth-shell footer { color: #bbb; }
+
+@media (max-width: 640px) {
+  .ps5-auth-skyline { height: 145px; }
+  .ps5-auth-brand { gap: 10px; margin-top: 20px; text-align: center; }
+  .ps5-auth-brand strong { font-size: clamp(1.6rem, 7vw, 2.5rem); }
+  .ps5-auth-brand small { font-size: .6rem; letter-spacing: .08em; }
+  .ps5-auth-mark { width: 44px; flex-shrink: 0; }
+  .ps5-auth-card { padding: 20px !important; }
+  .ps5-auth-shell main { padding-top: 25px; }
+}
