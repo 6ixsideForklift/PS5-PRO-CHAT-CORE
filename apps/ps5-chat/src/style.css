@@ -1,0 +1,59 @@
+:root { font-family: Arial, Helvetica, sans-serif; color: #f7f7f7; background: #080a0d; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { opacity: .6; cursor: wait; }
+.primary { border: 0; border-radius: 10px; background: #ffc119; color: #080a0d; font-weight: 800; padding: 13px 18px; }
+.primary:hover { background: #ffd760; }
+.secondary { border: 1px solid #ffc119; border-radius: 9px; background: transparent; color: #ffc119; font-weight: 700; padding: 12px 18px; }
+.secondary:hover { background: #ffc11920; }
+.status { min-height: 1.5rem; color: #d6d6d6; text-align: center; }
+.status.error { color: #ff8585; }
+.auth-page { min-height: 100vh; background: radial-gradient(ellipse at center, #242021, #090b0e 70%); overflow: hidden; }
+.banner { height: clamp(180px, 29vh, 310px); background: url('/banner.png') center / 100% 100% no-repeat; }
+.brand { display: flex; align-items: center; justify-content: center; gap: 22px; margin: 18px 12px 20px; }
+.brand-icon { width: clamp(60px, 7vw, 100px); filter: drop-shadow(4px 4px 0 #ffc119); }
+.brand strong { display: block; font-size: clamp(2rem, 5vw, 4.5rem); font-style: italic; letter-spacing: .035em; white-space: nowrap; }
+.brand small { display: block; margin-top: 6px; letter-spacing: .2em; }
+.auth-card { width: min(770px, calc(100% - 32px)); margin: auto; padding: 28px clamp(22px, 4vw, 64px); border: 2px solid #ffc119; border-radius: 24px; background: #111317; box-shadow: 0 0 20px #ffc11960; }
+.auth-card h1 { text-align: center; margin: 0 0 26px; font-size: clamp(1.5rem, 2.6vw, 2rem); font-weight: 500; }
+.auth-card form { display: grid; gap: 16px; }
+.auth-card input { width: 100%; height: 48px; padding: 0 16px; border: 1px solid #777; border-radius: 10px; background: #1a1d21; color: #fff; }
+.auth-card input::placeholder { color: #aaa; }
+.auth-card input:focus, textarea:focus { outline: 2px solid #ffc119; outline-offset: 1px; }
+.auth-card .secondary { width: 100%; margin-top: 18px; }
+.chat-page { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
+.sidebar { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-right: 1px solid #4d3b1c; background: #101114; }
+.sidebar > img { width: 100%; }
+.sidebar nav { display: grid; align-content: start; gap: 4px; flex: 1; overflow-y: auto; }
+.sidebar nav button, .account button { border: 0; border-radius: 8px; padding: 12px; background: transparent; color: #f7f7f7; text-align: left; }
+.sidebar nav button:hover, .sidebar nav button.selected { background: #302818; }
+.account { display: grid; gap: 6px; border-top: 1px solid #555; padding-top: 12px; overflow-wrap: anywhere; }
+.account span { font-size: .8rem; color: #aaa; }
+.chat-main { display: flex; flex-direction: column; min-width: 0; height: 100vh; }
+.chat-main header { display: flex; align-items: center; gap: 10px; padding: 16px 24px; border-bottom: 1px solid #4d3b1c; }
+.chat-main header img { width: 36px; }
+.chat-main h1 { margin: 0; font-size: 1.3rem; }
+#messages { flex: 1; overflow-y: auto; padding: 24px max(24px, calc((100% - 800px) / 2)); }
+.empty { color: #aaa; text-align: center; margin-top: 25vh; }
+.message { max-width: 800px; margin: 0 auto 22px; padding: 16px 18px; border: 1px solid #474747; border-radius: 14px; background: #15171b; }
+.message.user { border-color: #80600c; }
+.message strong { color: #ffc119; font-size: .85rem; }
+.message p { margin: 10px 0 0; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+#composer { display: flex; gap: 10px; padding: 14px max(24px, calc((100% - 800px) / 2)); }
+#prompt { flex: 1; min-height: 60px; max-height: 180px; resize: vertical; padding: 12px; border: 1px solid #777; border-radius: 10px; background: #1a1d21; color: #fff; }
+.chat-main .status { margin: 0 20px 10px; }
+@media (max-width: 700px) {
+  .banner { height: 140px; }
+  .brand { gap: 8px; text-align: center; }
+  .brand-icon { width: 45px; }
+  .brand strong { font-size: clamp(1.4rem, 6vw, 2.5rem); }
+  .brand small { font-size: .6rem; letter-spacing: .07em; }
+  .chat-page { grid-template-columns: 1fr; }
+  .sidebar { max-height: 180px; overflow: auto; }
+  .sidebar > img { display: none; }
+  .sidebar nav { display: none; }
+  .account { display: none; }
+  .chat-main { height: calc(100vh - 180px); }
+}
