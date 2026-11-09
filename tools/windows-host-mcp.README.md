@@ -54,10 +54,11 @@ are no path restrictions; commands execute without an approval prompt.
 ## Screen control
 
 The helper also offers `screen_monitors`, `screen_capture`, `screen_click`,
-`screen_type`, `screen_key`, `screen_scroll`, and `screen_control_end`. These
-require Python 3, Pillow, pytesseract, pywin32, Tesseract OCR, and Windows
-Tkinter on the host. `screen_capture` returns compact OCR text and coordinates
-for visible windows and controls. The local text model cannot accept a full
+`screen_click_control`, `screen_type`, `screen_key`, `screen_scroll`, and
+`screen_control_end`. These
+require Python 3, Pillow, pytesseract, pywin32, pywinauto, Tesseract OCR, and Windows
+Tkinter on the host. `screen_capture` returns Windows accessibility labels and
+coordinates for named windows, with OCR as a fallback. The local text model cannot accept a full
 MCP screenshot without exceeding its context window. A yellow **PS5 PRO
 OPERATOR · SCREEN CONTROL ACTIVE** banner appears on every monitor while the
 agent uses these tools. It scales with each monitor's resolution and is
@@ -86,7 +87,11 @@ to. When `activate_window_title` is provided, the capture waits briefly for a
 newly launched window and moves it to the monitor the agent selected. If no
 monitor was selected, it uses the primary monitor. Set
 `move_to_capture_monitor: false` to leave the window on its current monitor.
-The returned coordinates reflect its new location; use those for later clicks.
+The capture focuses on the window and returns Windows accessibility labels and
+bounds where available. `screen_click_control` clicks an exact named control,
+such as Calculator's `Seven` button, without guessing OCR coordinates. OCR is
+used for windows that lack accessible controls. The returned coordinates reflect
+the window's new location; use those for later coordinate clicks.
 
 Screen actions run as the signed-in Windows user and cannot control elevated
 windows or the Windows secure desktop. Only the private admin agent should use

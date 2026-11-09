@@ -12,6 +12,7 @@ from PIL import ImageGrab
 import pytesseract
 import win32clipboard
 import win32gui
+from pywinauto import Desktop
 
 
 user32 = ctypes.windll.user32
@@ -142,6 +143,35 @@ def window_inventory(options=None):
 
     win32gui.EnumWindows(add_window, None)
     return entries[:40]
+
+
+def accessible_controls(handle, bounds, depth=6):
+    """Read Windows UI Automation names and desktop bounds for the target app."""
+    if not handle:
+        return []
+    left, top, right, bottom = bounds
+    controls = []
+    try:
+        descendants = Desktop(backend="uia").window(handle=handle).descendants(depth=depth)
+        for control in descendants:
+            kind = control.element_info.control_type
+            if kind not in {"Button", "Text", "Edit", "CheckBox", "ComboBox",
+                            "Hyperlink", "MenuItem", "TabItem", "ListItem", "RadioButton"}:
+                continue
+            name = control.window_text().strip()[:120]
+            if not name and kind != "Edit":
+                continue
+            rect = control.rectangle()
+            if (rect.right <= left or rect.bottom <= top or rect.left >= right
+                    or rect.top >= bottom or rect.width() < 1 or rect.height() < 1):
+                continue
+            controls.append({"name": name, "type": kind, "x": rect.left, "y": rect.top,
+                             "width": rect.width(), "height": rect.height()})
+            if len(controls) >= 120:
+                break
+    except Exception:
+        return []
+    return controls
 
 
 def send(inputs):
@@ -309,7 +339,8 @@ def capture(request):
     if monitor is not None:
         if not isinstance(monitor, int) or monitor < 0 or monitor >= len(options):
             raise ValueError("Unknown monitor index; call screen_monitors first")
-        region = options[monitor]
+        if region is None:
+            region = options[monitor]
     if region:
         left = int(region["x"])
         top = int(region["y"])
@@ -324,7 +355,20 @@ def capture(request):
     else:
         left, top = 0, 0
         image = ImageGrab.grab(all_screens=False)
-    data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+    target_handle = (request.get("_activated_handle") or request.get("_target_handle")
+                     or request.get("expectedHandle"))
+    controls = accessible_controls(
+        target_handle, (left, top, left + image.width, top + image.height))
+    # OCR small controls at double size, but retain desktop coordinates below.
+    focused_window = bool(region) and image.width <= 1200 and image.height <= 900
+    ocr_scale = 2 if focused_window and image.width <= 1200 and image.height <= 900 else 1
+    if len(controls) >= 5:
+        data = {"text": []}
+    else:
+        ocr_image = image.resize((image.width * ocr_scale, image.height * ocr_scale)) if ocr_scale > 1 else image
+        data = pytesseract.image_to_data(
+            ocr_image, config="--psm 11" if focused_window else "--psm 3",
+            output_type=pytesseract.Output.DICT)
     lines = {}
     for index, word in enumerate(data["text"]):
         word = word.strip()
@@ -332,15 +376,19 @@ def capture(request):
             continue
         key = (data["block_num"][index], data["par_num"][index],
                data["line_num"][index])
-        item = lines.setdefault(key, {"text": [], "x": left + data["left"][index],
-                                      "y": top + data["top"][index],
-                                      "right": left + data["left"][index] + data["width"][index],
-                                      "bottom": top + data["top"][index] + data["height"][index]})
+        word_left = left + data["left"][index] // ocr_scale
+        word_top = top + data["top"][index] // ocr_scale
+        word_right = left + (data["left"][index] + data["width"][index] + ocr_scale - 1) // ocr_scale
+        word_bottom = top + (data["top"][index] + data["height"][index] + ocr_scale - 1) // ocr_scale
+        item = lines.setdefault(key, {"text": [], "x": word_left,
+                                      "y": word_top,
+                                      "right": word_right,
+                                      "bottom": word_bottom})
         item["text"].append(word)
-        item["x"] = min(item["x"], left + data["left"][index])
-        item["y"] = min(item["y"], top + data["top"][index])
-        item["right"] = max(item["right"], left + data["left"][index] + data["width"][index])
-        item["bottom"] = max(item["bottom"], top + data["top"][index] + data["height"][index])
+        item["x"] = min(item["x"], word_left)
+        item["y"] = min(item["y"], word_top)
+        item["right"] = max(item["right"], word_right)
+        item["bottom"] = max(item["bottom"], word_bottom)
     visible_text = [{"text": " ".join(item["text"]), "x": item["x"],
                      "y": item["y"], "width": item["right"] - item["x"],
                      "height": item["bottom"] - item["y"]}
@@ -392,6 +440,7 @@ def capture(request):
             monitor_for_rect((left, top, left + image.width, top + image.height), options)),
         "movedFromMonitor": request.get("_moved_from_monitor"),
         "foregroundWindow": win32gui.GetWindowText(foreground_window()),
+        "accessibleControls": controls,
         "text": visible_text[:100],
         "windows": visible_windows[:12],
         "otherMonitorWindows": [{key: entry[key] for key in ("title", "monitor", "minimized", "foreground")}
@@ -497,10 +546,12 @@ def main():
                 target_monitor = 0
             request["_moved_from_monitor"] = move_window_to_monitor(handle, target_monitor)
             request["monitor"] = target_monitor
-            request.pop("region", None)
+            x1, y1, x2, y2 = win32gui.GetWindowRect(handle)
+            request["region"] = {"x": x1, "y": y1, "width": x2 - x1, "height": y2 - y1}
         elif request.get("scope") != "all" and not request.get("move_to_capture_monitor", True):
-            request["monitor"] = None
-            request.pop("region", None)
+            request["monitor"] = monitor_for_rect(win32gui.GetWindowRect(handle), monitors())
+            x1, y1, x2, y2 = win32gui.GetWindowRect(handle)
+            request["region"] = {"x": x1, "y": y1, "width": x2 - x1, "height": y2 - y1}
     elif action == "click":
         if request.get("window_title"):
             target = activate_window(request["window_title"], request["x"], request["y"])
@@ -515,6 +566,24 @@ def main():
         for _ in range(request.get("count", 1)):
             send([mouse_event(down), mouse_event(up)])
             time.sleep(0.1)
+        request["_target_handle"] = target
+    elif action == "click_control":
+        name = request["control_name"]
+        matches = []
+        for control in Desktop(backend="uia").window(title=request["window_title"]).descendants(depth=6):
+            if control.window_text() == name and control.element_info.control_type in {
+                    "Button", "CheckBox", "Hyperlink", "MenuItem", "TabItem", "ListItem", "RadioButton"}:
+                matches.append(control)
+        if len(matches) != 1:
+            raise RuntimeError(f"Expected one clickable control named {name!r}; found {len(matches)}")
+        rect = matches[0].rectangle()
+        x, y = (rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2
+        target = activate_window(request["window_title"], x, y)
+        set_cursor(x, y)
+        if top_window_at(x, y) != target or foreground_window() != target:
+            raise RuntimeError("Another window covers the named control; no click was sent")
+        send([mouse_event(0x0002), mouse_event(0x0004)])
+        request["_target_handle"] = target
     elif action == "type":
         if not request.get("expectedHandle") or foreground_window() != request["expectedHandle"]:
             raise RuntimeError("The target window lost focus; no text was sent. Capture and click it again")
@@ -533,7 +602,7 @@ def main():
     if action != "capture":
         time.sleep(0.3)
     result = capture(request)
-    if action == "click":
+    if action in ("click", "click_control"):
         result["activeHandle"] = target
     print(json.dumps(result, separators=(",", ":")))
 

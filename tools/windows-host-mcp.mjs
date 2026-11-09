@@ -101,11 +101,12 @@ async function runScreenAction(request) {
   requireScreenEnabled();
   const result = await runScreenProcess(request);
   lastScreen = { originX: result.originX, originY: result.originY,
-    width: result.width, height: result.height, windows: result.windows, when: Date.now() };
-  if (request.action === 'click') lastTargetHandle = result.activeHandle;
+    width: result.width, height: result.height, windows: result.windows,
+    accessibleControls: result.accessibleControls, when: Date.now() };
+  if (request.action === 'click' || request.action === 'click_control') lastTargetHandle = result.activeHandle;
   keepScreenIndicatorVisible();
   return { content: [
-    { type: 'text', text: `Viewing monitor ${result.monitorIndex}; screen origin (${result.originX}, ${result.originY}); size ${result.width} × ${result.height}. ${result.movedFromMonitor == null ? '' : `Moved target here from monitor ${result.movedFromMonitor}. `}Foreground window: ${result.foregroundWindow}. Coordinates are absolute Windows desktop pixels. OCR text and window/control rectangles: ${JSON.stringify({ text: result.text, windows: result.windows, otherMonitorWindows: result.otherMonitorWindows })}` },
+    { type: 'text', text: `Viewing monitor ${result.monitorIndex}; screen origin (${result.originX}, ${result.originY}); size ${result.width} × ${result.height}. ${result.movedFromMonitor == null ? '' : `Moved target here from monitor ${result.movedFromMonitor}. `}Foreground window: ${result.foregroundWindow}. Coordinates are absolute Windows desktop pixels. Prefer screen_click_control with an exact accessible control name. OCR is a fallback when accessible controls are unavailable. ${JSON.stringify({ accessibleControls: result.accessibleControls, text: result.text, windows: result.windows, otherMonitorWindows: result.otherMonitorWindows })}` },
   ] };
 }
 
@@ -163,7 +164,7 @@ function createServer(adminRequest) {
     return { content: [{ type: 'text', text: result }] };
   });
   server.registerTool('screen_capture', {
-    description: 'Read OCR text and window/control rectangles. Call screen_monitors to find an app title. With activate_window_title, restore and bring the window in front, moving it to the requested monitor (primary monitor by default) before capture. Set move_to_capture_monitor=false to keep it on its current monitor. Other-monitor window titles are included. Starts visible control banners.',
+    description: 'Read exact Windows accessibility labels and bounds for a named app, with OCR fallback. Call screen_monitors to find its title. With activate_window_title, bring the window in front and move it to the requested monitor (primary by default), then read that window only. Prefer screen_click_control by exact label; use OCR positions only if controls are unavailable. Set move_to_capture_monitor=false to keep its current monitor. Starts visible control banners.',
     inputSchema: { scope: z.enum(['primary', 'all']).default('primary'),
       monitor: z.number().int().min(0).optional(),
       activate_window_title: z.string().min(1).optional(),
@@ -198,6 +199,25 @@ function createServer(adminRequest) {
       screenPointIsVisible(x, y);
       keepScreenIndicatorVisible();
       return runScreenAction({ action: 'click', window_title, x, y, button, count,
+        region: { x: lastScreen.originX, y: lastScreen.originY,
+          width: lastScreen.width, height: lastScreen.height } });
+    });
+  });
+  server.registerTool('screen_click_control', {
+    description: 'Click a uniquely named Windows UI control from the latest screen_capture, such as Calculator button Seven or Plus. Uses the current Windows accessibility bounds, verifies the named app is in front, and avoids guessing OCR coordinates. Recapture if the control name is missing.',
+    inputSchema: { window_title: z.string().min(1), control_name: z.string().min(1) },
+  }, async ({ window_title, control_name }) => {
+    authorize();
+    return withScreenLock(() => {
+      screenIsFresh();
+      if (!lastScreen.windows?.some((window) => window.title === window_title)) {
+        throw new Error('Named window is absent from the latest capture; recapture it first');
+      }
+      if (!lastScreen.accessibleControls?.some((control) => control.name === control_name)) {
+        throw new Error('Named control is absent from the latest capture; recapture or use screen_click');
+      }
+      keepScreenIndicatorVisible();
+      return runScreenAction({ action: 'click_control', window_title, control_name,
         region: { x: lastScreen.originX, y: lastScreen.originY,
           width: lastScreen.width, height: lastScreen.height } });
     });
